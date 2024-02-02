@@ -11,21 +11,26 @@ string vs = @"
 #version 330 core
 
 layout (location = 0) in vec2 ivPos;
+layout (location = 1) in vec3 ivColor;
+
+out vec3 oColor;
 
 void main()
 {
     gl_Position = vec4(ivPos, 0.0f, 1.0f);
+    oColor = vec3(ivColor);
 }
 ";
 
 string fs = @"
 #version 330 core
 
+in vec3 oColor;
 out vec4 ofColor;
 
 void main()
 {
-    ofColor = vec4(1.0f);
+    ofColor = vec4(oColor, 1.0f);
 }
 ";
 
@@ -50,16 +55,14 @@ unsafe
 
     float[] vertices =
     [
-         0.9f,  0.9f,
-         0.9f, -0.9f,
-        -0.9f, -0.9f,
-        -0.9f,  0.9f,
+         0.0f,  0.5f, 1.0f, 0.0f, 0.0f,
+         0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+        -0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
     ];
 
     uint[] indices =
     [
         0, 1, 2,
-        0, 2, 3,
     ];
 
     Shader shader = new(vs, fs, gl);
@@ -78,8 +81,13 @@ unsafe
         fixed (void* ptr = &indices[0])
             gl.BufferData(BufferTargetARB.ElementArrayBuffer, (uint)(sizeof(uint) * indices.Length), ptr, BufferUsageARB.StaticDraw);
 
-        gl.VertexAttribPointer(0, 2, GLEnum.Float, false, 2 * sizeof(float), null);
+        gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, 
+            false, 5 * sizeof(float), (void*)0);
         gl.EnableVertexAttribArray(0);
+
+        gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float,
+            false, 5 * sizeof(float), (void*)(2 * sizeof(float)));
+        gl.EnableVertexAttribArray(1);
 
         // vbo is bound to vertex attribute's buffer, so we can safely unbind it.
         gl.BindBuffer(GLEnum.ArrayBuffer, 0);
