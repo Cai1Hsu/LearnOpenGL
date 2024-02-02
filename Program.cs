@@ -1,7 +1,10 @@
-﻿using Silk.NET.Maths;
+﻿using System.Diagnostics;
+using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.SDL;
+using static System.Math;
 
+Stopwatch Timer = Stopwatch.StartNew();
 // internally call SDL.Init()
 Sdl sdl = Sdl.GetApi();
 
@@ -22,10 +25,11 @@ string fs = @"
 #version 330 core
 
 out vec4 ofColor;
+uniform vec3 uPos;
 
 void main()
 {
-    ofColor = vec4(1.0f);
+    ofColor = vec4(uPos, 1.0f);
 }
 ";
 
@@ -91,12 +95,18 @@ unsafe
     gl.PolygonMode(GLEnum.FrontAndBack, PolygonMode.Line);
     gl.PolygonMode(GLEnum.FrontAndBack, PolygonMode.Fill);
 
+    int ulocation = gl.GetUniformLocation(shader.Program, "uPos");
+
     void Draw()
     {
         gl.ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         gl.Clear(ClearBufferMask.ColorBufferBit);
 
         gl.UseProgram(shader.Program);
+        {
+            float color = (float)(Sin(Timer.ElapsedMilliseconds / 1000.0f) + 1.0f) / 2.0f;
+            gl.Uniform3(ulocation, 0.2f, color, 0.8f);
+        }
 
         gl.BindVertexArray(vao);
         {
