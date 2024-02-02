@@ -1,6 +1,12 @@
-﻿using Silk.NET.Maths;
+﻿using System.Diagnostics;
+using Silk.NET.GLFW;
+using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.SDL;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using Image = SixLabors.ImageSharp.Image;
 
 // internally call SDL.Init()
 Sdl sdl = Sdl.GetApi();
@@ -10,22 +16,30 @@ Vector2D<int> size = new(1024, 768);
 string vs = @"
 #version 330 core
 
-layout (location = 0) in vec2 ivPos;
+layout (location = 0) in vec2 aPos;
+layout (location = 1) in vec2 aTexUV;
+
+out vec2 TexUV;
 
 void main()
 {
-    gl_Position = vec4(ivPos, 0.0f, 1.0f);
+    gl_Position = vec4(aPos, 0.0f, 1.0f);
+    TexUV = vec2(aTexUV);
 }
 ";
 
 string fs = @"
 #version 330 core
 
+in vec2 TexUV;
 out vec4 ofColor;
+
+uniform sampler2D uTexture;
 
 void main()
 {
-    ofColor = vec4(1.0f);
+    ofColor = texture(uTexture, TexUV);
+    // ofColor = vec4(1.0f);
 }
 ";
 
@@ -50,10 +64,11 @@ unsafe
 
     float[] vertices =
     [
-         0.9f,  0.9f,
-         0.9f, -0.9f,
-        -0.9f, -0.9f,
-        -0.9f,  0.9f,
+        // vertex     // texture
+         0.9f,  0.9f, 1.0f, 1.0f,
+         0.9f, -0.9f, 1.0f, 0.0f,
+        -0.9f, -0.9f, 0.0f, 0.0f,
+        -0.9f,  0.9f, 0.0f, 1.0f,
     ];
 
     uint[] indices =
@@ -78,8 +93,11 @@ unsafe
         fixed (void* ptr = &indices[0])
             gl.BufferData(BufferTargetARB.ElementArrayBuffer, (uint)(sizeof(uint) * indices.Length), ptr, BufferUsageARB.StaticDraw);
 
-        gl.VertexAttribPointer(0, 2, GLEnum.Float, false, 2 * sizeof(float), null);
+        gl.VertexAttribPointer(0, 2, GLEnum.Float, false, 4 * sizeof(float), (void*)null);
         gl.EnableVertexAttribArray(0);
+
+        gl.VertexAttribPointer(1, 2, GLEnum.Float, false, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+        gl.EnableVertexAttribArray(1);
 
         // vbo is bound to vertex attribute's buffer, so we can safely unbind it.
         gl.BindBuffer(GLEnum.ArrayBuffer, 0);
@@ -91,12 +109,22 @@ unsafe
     gl.PolygonMode(GLEnum.FrontAndBack, PolygonMode.Line);
     gl.PolygonMode(GLEnum.FrontAndBack, PolygonMode.Fill);
 
+    Texture texture = null!;
+    using (var img = Image.Load<Rgba32>("container.jpg"))
+    {
+        texture = new(img, gl);
+    }
+
+    Debug.Assert(texture != null);
+
     void Draw()
     {
         gl.ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         gl.Clear(ClearBufferMask.ColorBufferBit);
 
         gl.UseProgram(shader.Program);
+
+        gl.BindTexture(TextureTarget.Texture2D, texture.Id);
 
         gl.BindVertexArray(vao);
         {
@@ -106,7 +134,11 @@ unsafe
         gl.BindVertexArray(0);
     }
 
-    while (true)
+    bool running = true;
+
+    Console.CancelKeyPress += (_, _) => running = false;
+
+    while (running)
     {
         sdl.PumpEvents();
 
